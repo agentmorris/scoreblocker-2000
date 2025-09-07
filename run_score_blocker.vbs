@@ -1,0 +1,1 @@
+CreateObject("Wscript.Shell").Run "pythonw score_blocker.py", 0
