@@ -68,11 +68,13 @@ The settings file (`score_blocker_settings.json`) is created alongside the Pytho
     "y": 200,
     "width": 200,
     "height": 100
-  }
+  },
+  "background_color": "#000000",
+  "border_color": "#D3D3D3"
 }
 ```
 
-Edit the `secondary` section to set your preferred alternate position and size.
+Edit the `secondary` section to set your preferred alternate position and size. Customize `background_color` and `border_color` using hex color codes (e.g., "#FF0000" for red).
 
 ## 🏅 Technical Requirements
 

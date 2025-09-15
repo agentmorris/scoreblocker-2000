@@ -21,6 +21,8 @@ class ScoreBlocker:
         self.start_y = 0
         self.start_width = 0
         self.start_height = 0
+        self.background_color = '#000000'
+        self.border_color = '#D3D3D3'
         
         self.setup_window()
         self.load_settings()
@@ -37,8 +39,11 @@ class ScoreBlocker:
         # Make window always on top
         self.root.attributes('-topmost', True)
         
-        # Set black background
-        self.root.configure(bg='black')
+        # Set background color (will be updated when settings load)
+        self.root.configure(bg=self.background_color)
+        
+        # Show border by default
+        self.root.configure(highlightbackground=self.border_color, highlightthickness=2)
         
         # Set cursor to hand when hovering
         self.root.configure(cursor='hand2')
@@ -47,8 +52,8 @@ class ScoreBlocker:
         self.text_label = tk.Label(
             self.root,
             text="ScoreBlocker 2000",
-            fg='black',  # Start hidden (same color as background)
-            bg='black',
+            fg=self.background_color,  # Start hidden (same color as background)
+            bg=self.background_color,
             font=('Arial', 8, 'normal'),
             justify='right'
         )
@@ -68,6 +73,14 @@ class ScoreBlocker:
                     width = primary.get('width', 200)
                     height = primary.get('height', 100)
                     self.root.geometry(f"{width}x{height}+{x}+{y}")
+                    
+                    # Load color settings
+                    self.background_color = settings.get('background_color', '#000000')
+                    self.border_color = settings.get('border_color', '#D3D3D3')
+                    
+                    # Apply colors to UI
+                    self.root.configure(bg=self.background_color, highlightbackground=self.border_color, highlightthickness=2)
+                    self.text_label.configure(bg=self.background_color, fg=self.background_color)
             else:
                 # Create initial settings file with default positions
                 self.create_default_settings()
@@ -89,7 +102,9 @@ class ScoreBlocker:
                 "y": 200,
                 "width": 200,
                 "height": 100
-            }
+            },
+            "background_color": "#000000",
+            "border_color": "#D3D3D3"
         }
         try:
             with open(self.settings_file, 'w') as f:
@@ -118,7 +133,9 @@ class ScoreBlocker:
                     "y": 200,
                     "width": 200,
                     "height": 100
-                }
+                },
+                "background_color": "#000000",
+                "border_color": "#D3D3D3"
             }
             
             if os.path.exists(self.settings_file):
@@ -154,32 +171,38 @@ class ScoreBlocker:
         self.root.bind('<Leave>', self.on_leave)
         
     def on_enter(self, event):
-        """Show white border and text when mouse enters window"""
-        self.root.configure(highlightbackground='white', highlightthickness=2)
-        self.text_label.configure(fg='white')  # Make text visible
+        """Show text when mouse enters window"""
+        self.text_label.configure(fg=self.border_color)  # Make text visible
         
     def on_leave(self, event):
-        """Hide border and text when mouse leaves window"""
-        self.root.configure(highlightthickness=0)
-        self.text_label.configure(fg='black')  # Hide text by making it same color as background
+        """Hide text when mouse leaves window"""
+        self.text_label.configure(fg=self.background_color)  # Hide text by making it same color as background
         
     def on_motion(self, event):
         """Handle mouse motion for cursor changes at edges"""
-        # Ensure border and text remain visible during motion within window
-        self.root.configure(highlightbackground='white', highlightthickness=2)
-        self.text_label.configure(fg='white')
+        # Ensure text remains visible during motion within window
+        self.text_label.configure(fg=self.border_color)
         
         width = self.root.winfo_width()
         height = self.root.winfo_height()
         
-        # Check if near bottom-right corner (within 10 pixels of both edges)
-        if width - event.x <= 10 and height - event.y <= 10:
+        # Check corners first (within 10 pixels of both edges)
+        if event.x <= 10 and event.y <= 10:  # Top-left corner
             self.root.configure(cursor='sizing')
-        # Check if near right edge (within 10 pixels)
-        elif width - event.x <= 10:
+        elif width - event.x <= 10 and event.y <= 10:  # Top-right corner
+            self.root.configure(cursor='sizing')
+        elif event.x <= 10 and height - event.y <= 10:  # Bottom-left corner
+            self.root.configure(cursor='sizing')
+        elif width - event.x <= 10 and height - event.y <= 10:  # Bottom-right corner
+            self.root.configure(cursor='sizing')
+        # Check edges (within 10 pixels)
+        elif event.x <= 10:  # Left edge
             self.root.configure(cursor='sb_h_double_arrow')
-        # Check if near bottom edge (within 10 pixels)
-        elif height - event.y <= 10:
+        elif width - event.x <= 10:  # Right edge
+            self.root.configure(cursor='sb_h_double_arrow')
+        elif event.y <= 10:  # Top edge
+            self.root.configure(cursor='sb_v_double_arrow')
+        elif height - event.y <= 10:  # Bottom edge
             self.root.configure(cursor='sb_v_double_arrow')
         else:
             self.root.configure(cursor='hand2')
@@ -192,22 +215,38 @@ class ScoreBlocker:
         width = self.root.winfo_width()
         height = self.root.winfo_height()
         
-        # Check if clicking near bottom-right corner for diagonal resizing
-        if width - event.x <= 10 and height - event.y <= 10:
+        # Store initial position for resizing operations that need it
+        self.start_win_x = self.root.winfo_x()
+        self.start_win_y = self.root.winfo_y()
+        self.start_width = width
+        self.start_height = height
+        
+        # Check corners first (within 10 pixels of both edges)
+        if event.x <= 10 and event.y <= 10:  # Top-left corner
             self.resizing = True
-            self.resize_edge = 'diagonal'
-            self.start_width = width
-            self.start_height = height
-        # Check if clicking near right edge for horizontal resizing
-        elif width - event.x <= 10:
+            self.resize_edge = 'top_left'
+        elif width - event.x <= 10 and event.y <= 10:  # Top-right corner
+            self.resizing = True
+            self.resize_edge = 'top_right'
+        elif event.x <= 10 and height - event.y <= 10:  # Bottom-left corner
+            self.resizing = True
+            self.resize_edge = 'bottom_left'
+        elif width - event.x <= 10 and height - event.y <= 10:  # Bottom-right corner
+            self.resizing = True
+            self.resize_edge = 'bottom_right'
+        # Check edges (within 10 pixels)
+        elif event.x <= 10:  # Left edge
+            self.resizing = True
+            self.resize_edge = 'left'
+        elif width - event.x <= 10:  # Right edge
             self.resizing = True
             self.resize_edge = 'right'
-            self.start_width = width
-        # Check if clicking near bottom edge for vertical resizing
-        elif height - event.y <= 10:
+        elif event.y <= 10:  # Top edge
+            self.resizing = True
+            self.resize_edge = 'top'
+        elif height - event.y <= 10:  # Bottom edge
             self.resizing = True
             self.resize_edge = 'bottom'
-            self.start_height = height
         else:
             self.dragging = True
             
@@ -224,31 +263,50 @@ class ScoreBlocker:
             self.start_y = event.y_root
             
         elif self.resizing:
-            # Resize the window
+            dx = event.x_root - self.start_x
+            dy = event.y_root - self.start_y
+            
+            # Calculate new dimensions based on resize edge/corner
+            new_x = self.start_win_x
+            new_y = self.start_win_y  
+            new_width = self.start_width
+            new_height = self.start_height
+            
             if self.resize_edge == 'right':
-                dx = event.x_root - self.start_x
-                new_width = max(50, self.start_width + dx)  # Minimum width of 50
-                height = self.root.winfo_height()
-                x = self.root.winfo_x()
-                y = self.root.winfo_y()
-                self.root.geometry(f"{new_width}x{height}+{x}+{y}")
+                new_width = max(50, self.start_width + dx)
+                
+            elif self.resize_edge == 'left':
+                new_width = max(50, self.start_width - dx)
+                new_x = self.start_win_x + dx if new_width > 50 else self.start_win_x + (self.start_width - 50)
                 
             elif self.resize_edge == 'bottom':
-                dy = event.y_root - self.start_y
-                new_height = max(30, self.start_height + dy)  # Minimum height of 30
-                width = self.root.winfo_width()
-                x = self.root.winfo_x()
-                y = self.root.winfo_y()
-                self.root.geometry(f"{width}x{new_height}+{x}+{y}")
+                new_height = max(30, self.start_height + dy)
                 
-            elif self.resize_edge == 'diagonal':
-                dx = event.x_root - self.start_x
-                dy = event.y_root - self.start_y
-                new_width = max(50, self.start_width + dx)  # Minimum width of 50
-                new_height = max(30, self.start_height + dy)  # Minimum height of 30
-                x = self.root.winfo_x()
-                y = self.root.winfo_y()
-                self.root.geometry(f"{new_width}x{new_height}+{x}+{y}")
+            elif self.resize_edge == 'top':
+                new_height = max(30, self.start_height - dy)
+                new_y = self.start_win_y + dy if new_height > 30 else self.start_win_y + (self.start_height - 30)
+                
+            elif self.resize_edge == 'top_left':
+                new_width = max(50, self.start_width - dx)
+                new_height = max(30, self.start_height - dy)
+                new_x = self.start_win_x + dx if new_width > 50 else self.start_win_x + (self.start_width - 50)
+                new_y = self.start_win_y + dy if new_height > 30 else self.start_win_y + (self.start_height - 30)
+                
+            elif self.resize_edge == 'top_right':
+                new_width = max(50, self.start_width + dx)
+                new_height = max(30, self.start_height - dy)
+                new_y = self.start_win_y + dy if new_height > 30 else self.start_win_y + (self.start_height - 30)
+                
+            elif self.resize_edge == 'bottom_left':
+                new_width = max(50, self.start_width - dx)
+                new_height = max(30, self.start_height + dy)
+                new_x = self.start_win_x + dx if new_width > 50 else self.start_win_x + (self.start_width - 50)
+                
+            elif self.resize_edge == 'bottom_right':
+                new_width = max(50, self.start_width + dx)
+                new_height = max(30, self.start_height + dy)
+            
+            self.root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
                 
     def on_release(self, event):
         """Handle mouse release - stop dragging/resizing and save settings"""
