@@ -9,15 +9,15 @@ ScoreBlocker 2000 is advanced technology for sports fans who want to watch games
 * Always on top
 * Frameless design (no distracting graphics, just a big black rectangle)
 * Drag to move/resize
+* Multi-monitor support with preset configurations
+* Launch multiple instances simultaneously
 
 ## 🏃‍♂️ Mobility & Control
 
-- Click and drag to move ScoreBlocker 2000 anywhere on your screen
-- Dual position system
-  - Primary position: automatically saves your last position
-  - Secondary position: set a custom position in the settings file for quick switching
-- Right-click: jump to your secondary position
-- Double-click to exit
+- **Left-click and drag**: Move ScoreBlocker 2000 anywhere on your screen
+- **Drag from edges or corners**: Resize the window
+- **Middle-click**: Show current coordinates and copy to clipboard (helpful for creating config files!)
+- **Right-click**: Exit the application
 
 ## 🏁 Getting Started
 
@@ -26,7 +26,7 @@ ScoreBlocker 2000 is advanced technology for sports fans who want to watch games
 * Ensure you have Python installed on your Windows system
 * Clone or download this repository
 
-### Running the Application
+### Running Single Instance
 
 **Option 1: Double-click the VBS script (recommended)**
 
@@ -46,40 +46,97 @@ python score_blocker.py
 run_score_blocker.bat
 ```
 
-### Creating a Desktop Shortcut
+### Multi-Monitor Setup (Recommended for Multiple Windows)
 
-For the cleanest experience, create a desktop shortcut to `run_score_blocker.vbs`.
+For launching two ScoreBlocker windows simultaneously on specific monitors:
 
+**Step 1: Create your configuration files**
 
-### Settings File
-
-The settings file (`score_blocker_settings.json`) is created alongside the Python script:
+Create JSON configuration files with your desired window positions. Sample configs are provided in `configs/monitor1.json` and `configs/monitor2.json`:
 
 ```json
 {
   "primary": {
     "x": 100,
-    "y": 100,
-    "width": 200,
-    "height": 100
+    "y": 50,
+    "width": 300,
+    "height": 150
   },
   "secondary": {
-    "x": 300,
-    "y": 200,
-    "width": 200,
-    "height": 100
+    "x": 1500,
+    "y": 50,
+    "width": 300,
+    "height": 150
   },
   "background_color": "#000000",
   "border_color": "#D3D3D3"
 }
 ```
 
-Edit the `secondary` section to set your preferred alternate position and size. Customize `background_color` and `border_color` using hex color codes (e.g., "#FF0000" for red).
+You can store config files anywhere (even outside the repo) and reference them by path.
+
+**Step 2: Launch your monitor setup**
+
+Use the provided VBS launcher scripts:
+- `scoreblocker_launch_monitor1.vbs` - Launches two windows using `configs/monitor1.json`
+- `scoreblocker_launch_monitor2.vbs` - Launches two windows using `configs/monitor2.json`
+- `scoreblocker_close_all.vbs` - Closes all running ScoreBlocker instances
+
+Or use the command line:
+```bash
+python launch_monitor.py configs/monitor1.json
+```
+
+**Step 3: Create desktop shortcuts**
+
+Create desktop shortcuts to `launch_monitor1.vbs` and `launch_monitor2.vbs` for quick access to your different monitor setups.
+
+### Configuration File Format
+
+Configuration files specify two window positions (primary and secondary) plus color settings:
+
+```json
+{
+  "primary": {
+    "x": 100,
+    "y": 50,
+    "width": 300,
+    "height": 150
+  },
+  "secondary": {
+    "x": 1500,
+    "y": 50,
+    "width": 300,
+    "height": 150
+  },
+  "background_color": "#000000",
+  "border_color": "#D3D3D3"
+}
+```
+
+Customize `background_color` and `border_color` using hex color codes (e.g., "#FF0000" for red).
 
 ## 🏅 Technical Requirements
 
 - **Operating System**: Windows
 - **Python**: Any version with tkinter (usually included)
+
+## ⚙️ Advanced Usage
+
+### Command Line Options
+
+```bash
+python score_blocker.py --help
+```
+
+Available options:
+- `--config_file PATH` - Use a specific configuration file
+- `--position primary|secondary` - Launch at specific position from config
+- `--close_all` - Close all running ScoreBlocker instances
+
+### Custom Launchers
+
+You can create your own launcher scripts to set up multiple windows with different configurations. See `launch_monitor.py` for an example.
 
 ## 🤝 Contributing
 

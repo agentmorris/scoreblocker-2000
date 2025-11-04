@@ -1,0 +1,6 @@
+{
+  "primary": {"x": 50, "y": 97, "width": 137, "height": 116},
+  "secondary": {"x": 0, "y": 1085, "width": 1920, "height": 46},
+  "background_color": "#000000",
+  "border_color": "#D3D3D3"
+}

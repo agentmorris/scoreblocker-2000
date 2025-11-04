@@ -3,17 +3,35 @@
 Score Blocker 2000 - A simple overlay window to block scores on screen
 """
 
-import tkinter as tk
 import json
 import os
+import argparse
+import subprocess
+import sys
 from typing import Dict, Any
 
+# Enable unbuffered output
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except:
+        pass
+
 class ScoreBlocker:
-    def __init__(self):
+    def __init__(self, config_file=None, position='primary'):
+        import tkinter as tk
+        self.tk = tk  # Store reference to tk module
         self.root = tk.Tk()
         # Get the directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.settings_file = os.path.join(script_dir, "score_blocker_settings.json")
+
+        # Use specified config file or default to score_blocker_settings.json
+        if config_file:
+            self.settings_file = config_file
+        else:
+            self.settings_file = os.path.join(script_dir, "score_blocker_settings.json")
+
+        self.position = position  # 'primary' or 'secondary'
         self.dragging = False
         self.resizing = False
         self.resize_edge = None
@@ -23,7 +41,7 @@ class ScoreBlocker:
         self.start_height = 0
         self.background_color = '#000000'
         self.border_color = '#D3D3D3'
-        
+
         self.setup_window()
         self.load_settings()
         self.bind_events()
@@ -49,7 +67,7 @@ class ScoreBlocker:
         self.root.configure(cursor='hand2')
         
         # Create label for text display (initially hidden)
-        self.text_label = tk.Label(
+        self.text_label = self.tk.Label(
             self.root,
             text="ScoreBlocker 2000",
             fg=self.background_color,  # Start hidden (same color as background)
@@ -66,18 +84,18 @@ class ScoreBlocker:
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, 'r') as f:
                     settings = json.load(f)
-                    # Load primary position (last known position)
-                    primary = settings.get('primary', {})
-                    x = primary.get('x', 100)
-                    y = primary.get('y', 100)
-                    width = primary.get('width', 200)
-                    height = primary.get('height', 100)
+                    # Load specified position (primary or secondary)
+                    position_settings = settings.get(self.position, {})
+                    x = position_settings.get('x', 100)
+                    y = position_settings.get('y', 100)
+                    width = position_settings.get('width', 200)
+                    height = position_settings.get('height', 100)
                     self.root.geometry(f"{width}x{height}+{x}+{y}")
-                    
+
                     # Load color settings
                     self.background_color = settings.get('background_color', '#000000')
                     self.border_color = settings.get('border_color', '#D3D3D3')
-                    
+
                     # Apply colors to UI
                     self.root.configure(bg=self.background_color, highlightbackground=self.border_color, highlightthickness=2)
                     self.text_label.configure(bg=self.background_color, fg=self.background_color)
@@ -112,48 +130,6 @@ class ScoreBlocker:
         except Exception as e:
             print(f"Error creating default settings: {e}")
             
-    def save_settings(self):
-        """Save current position and size to primary position in settings file"""
-        try:
-            x = self.root.winfo_x()
-            y = self.root.winfo_y()
-            width = self.root.winfo_width()
-            height = self.root.winfo_height()
-            
-            # Load existing settings to preserve secondary position
-            settings = {
-                "primary": {
-                    "x": 100,
-                    "y": 100,
-                    "width": 200,
-                    "height": 100
-                },
-                "secondary": {
-                    "x": 300,
-                    "y": 200,
-                    "width": 200,
-                    "height": 100
-                },
-                "background_color": "#000000",
-                "border_color": "#D3D3D3"
-            }
-            
-            if os.path.exists(self.settings_file):
-                with open(self.settings_file, 'r') as f:
-                    settings = json.load(f)
-            
-            # Update only the primary position
-            settings['primary'] = {
-                'x': x,
-                'y': y,
-                'width': width,
-                'height': height
-            }
-            
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=2)
-        except Exception as e:
-            print(f"Error saving settings: {e}")
             
     def bind_events(self):
         """Bind mouse events for interaction"""
@@ -162,10 +138,10 @@ class ScoreBlocker:
             widget.bind('<Button-1>', self.on_click)
             widget.bind('<B1-Motion>', self.on_drag)
             widget.bind('<ButtonRelease-1>', self.on_release)
-            widget.bind('<Double-Button-1>', self.on_double_click)
-            widget.bind('<Button-3>', self.on_right_click)  # Right-click
+            widget.bind('<Button-2>', self.on_middle_click)  # Middle-click
+            widget.bind('<Button-3>', self.on_right_click)  # Right-click (exit)
             widget.bind('<Motion>', self.on_motion)
-        
+
         # Use a single enter/leave on root only, and check mouse position in motion
         self.root.bind('<Enter>', self.on_enter)
         self.root.bind('<Leave>', self.on_leave)
@@ -309,36 +285,140 @@ class ScoreBlocker:
             self.root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
                 
     def on_release(self, event):
-        """Handle mouse release - stop dragging/resizing and save settings"""
+        """Handle mouse release - stop dragging/resizing"""
         self.dragging = False
         self.resizing = False
         self.resize_edge = None
-        self.save_settings()
-        
-    def on_double_click(self, event):
-        """Handle double-click - close the application"""
-        self.save_settings()
-        self.root.quit()
-        
+
     def on_right_click(self, event):
-        """Handle right-click - switch to secondary position"""
+        """Handle right-click - close the application"""
+        self.root.quit()
+
+    def on_middle_click(self, event):
+        """Handle middle-click - show and copy coordinates to clipboard"""
         try:
-            if os.path.exists(self.settings_file):
-                with open(self.settings_file, 'r') as f:
-                    settings = json.load(f)
-                    secondary = settings.get('secondary', {})
-                    x = secondary.get('x', 300)
-                    y = secondary.get('y', 200)
-                    width = secondary.get('width', 200)
-                    height = secondary.get('height', 100)
-                    self.root.geometry(f"{width}x{height}+{x}+{y}")
+            # Get current window position and size
+            x = self.root.winfo_x()
+            y = self.root.winfo_y()
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+
+            # Format coordinates as JSON
+            coord_text = f'{{"x": {x}, "y": {y}, "width": {width}, "height": {height}}}'
+
+            # Copy to clipboard
+            self.root.clipboard_clear()
+            self.root.clipboard_append(coord_text)
+
+            # Update label to show coordinates
+            self.text_label.configure(
+                text=f"Copied!\nx={x}, y={y}\nw={width}, h={height}",
+                fg=self.border_color
+            )
+
+            # Reset text after 2 seconds
+            self.root.after(2000, self.reset_label_text)
+
         except Exception as e:
-            print(f"Error loading secondary position: {e}")
-        
+            print(f"Error getting coordinates: {e}")
+
+    def reset_label_text(self):
+        """Reset label text back to default"""
+        self.text_label.configure(text="ScoreBlocker 2000")
+
     def run(self):
         """Start the application"""
         self.root.mainloop()
 
+
+def close_all_instances():
+    """Close all running ScoreBlocker instances"""
+    killed_count = 0
+
+    try:
+        # Use PowerShell with WMI to find processes by command line
+        # Using -EncodedCommand to avoid quoting issues
+        ps_script = (
+            "$procs = Get-WmiObject Win32_Process -Filter \"Name='python.exe' OR Name='pythonw.exe'\"; "
+            "$procs | Where-Object { $_.CommandLine -like '*score_blocker.py*' } | "
+            "ForEach-Object { Write-Output $_.ProcessId }"
+        )
+
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps_script],
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            current_pid = str(os.getpid())  # Get current process ID
+
+            for pid in pids:
+                pid = pid.strip()
+
+                # Skip the current process to avoid killing ourselves
+                if pid == current_pid:
+                    continue
+
+                if pid.isdigit():
+                    try:
+                        kill_result = subprocess.run(
+                            ['taskkill', '/F', '/PID', pid],
+                            capture_output=True,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                        )
+                        if kill_result.returncode == 0:
+                            print(f"Closed ScoreBlocker instance (PID: {pid})")
+                            sys.stdout.flush()
+                            killed_count += 1
+                        else:
+                            print(f"Failed to close PID {pid}: {kill_result.stderr}")
+                            sys.stdout.flush()
+                    except Exception as e:
+                        print(f"Error killing process {pid}: {e}")
+                        sys.stdout.flush()
+
+        if killed_count > 0:
+            print(f"Total instances closed: {killed_count}")
+            sys.stdout.flush()
+        else:
+            print("No running ScoreBlocker instances found")
+            sys.stdout.flush()
+
+    except Exception as e:
+        print(f"Error closing instances: {e}")
+        sys.stdout.flush()
+
+
 if __name__ == "__main__":
-    app = ScoreBlocker()
-    app.run()
+    parser = argparse.ArgumentParser(description='ScoreBlocker 2000 - Block scores on screen')
+    parser.add_argument('--config_file', type=str, help='Path to configuration file')
+    parser.add_argument('--position', type=str, choices=['primary', 'secondary'],
+                       default='primary', help='Which position to load from config (primary or secondary)')
+    parser.add_argument('--close_all', action='store_true',
+                       help='Close all running ScoreBlocker instances and exit')
+
+    args = parser.parse_args()
+
+    if args.close_all:
+        try:
+            close_all_instances()
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error in close_all: {e}")
+            sys.stdout.flush()
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+
+    try:
+        app = ScoreBlocker(config_file=args.config_file, position=args.position)
+        app.run()
+    except Exception as e:
+        print(f"Error running ScoreBlocker: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

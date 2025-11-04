@@ -1,0 +1,6 @@
+@echo off
+echo Testing close_all functionality...
+python score_blocker.py --close_all
+echo.
+echo Press any key to exit...
+pause > nul
