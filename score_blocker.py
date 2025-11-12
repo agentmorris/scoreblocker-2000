@@ -139,7 +139,7 @@ class ScoreBlocker:
             widget.bind('<B1-Motion>', self.on_drag)
             widget.bind('<ButtonRelease-1>', self.on_release)
             widget.bind('<Button-2>', self.on_middle_click)  # Middle-click
-            widget.bind('<Button-3>', self.on_right_click)  # Right-click (exit)
+            widget.bind('<ButtonRelease-3>', self.on_right_release)  # Right-click release (exit)
             widget.bind('<Motion>', self.on_motion)
 
         # Use a single enter/leave on root only, and check mouse position in motion
@@ -290,9 +290,10 @@ class ScoreBlocker:
         self.resizing = False
         self.resize_edge = None
 
-    def on_right_click(self, event):
-        """Handle right-click - close the application"""
+    def on_right_release(self, event):
+        """Handle right-click release - close the application"""
         self.root.quit()
+        return "break"  # Prevent event from propagating to windows below
 
     def on_middle_click(self, event):
         """Handle middle-click - show and copy coordinates to clipboard"""
