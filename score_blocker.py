@@ -50,6 +50,11 @@ class ScoreBlocker:
         """Configure the main window properties"""
         # Remove window decorations and make it frameless
         self.root.overrideredirect(True)
+
+        # Set a recognizable WM_NAME so external tools (the geometry-capture
+        # script in auto-scoreblock) can find ScoreBlocker windows by title.
+        # Not visible since there's no title bar.
+        self.root.wm_title("ScoreBlocker2000")
         
         # Set initial size and position
         self.root.geometry("200x100+100+100")
@@ -60,8 +65,15 @@ class ScoreBlocker:
         # Set background color (will be updated when settings load)
         self.root.configure(bg=self.background_color)
         
-        # Show border by default
-        self.root.configure(highlightbackground=self.border_color, highlightthickness=2)
+        # Show border by default. Set both highlightbackground (unfocused) and
+        # highlightcolor (focused) so the border stays visible regardless of
+        # focus state — important for the double-click flash to work after the
+        # click gives the window focus.
+        self.root.configure(
+            highlightbackground=self.border_color,
+            highlightcolor=self.border_color,
+            highlightthickness=2,
+        )
         
         # Set cursor to hand when hovering
         self.root.configure(cursor='hand2')
@@ -97,7 +109,12 @@ class ScoreBlocker:
                     self.border_color = settings.get('border_color', '#D3D3D3')
 
                     # Apply colors to UI
-                    self.root.configure(bg=self.background_color, highlightbackground=self.border_color, highlightthickness=2)
+                    self.root.configure(
+                        bg=self.background_color,
+                        highlightbackground=self.border_color,
+                        highlightcolor=self.border_color,
+                        highlightthickness=2,
+                    )
                     self.text_label.configure(bg=self.background_color, fg=self.background_color)
             else:
                 # Create initial settings file with default positions
@@ -138,6 +155,7 @@ class ScoreBlocker:
             widget.bind('<Button-1>', self.on_click)
             widget.bind('<B1-Motion>', self.on_drag)
             widget.bind('<ButtonRelease-1>', self.on_release)
+            widget.bind('<Double-Button-1>', self.on_double_click)
             widget.bind('<Button-2>', self.on_middle_click)  # Middle-click
             widget.bind('<ButtonRelease-3>', self.on_right_release)  # Right-click release (exit)
             widget.bind('<Motion>', self.on_motion)
@@ -145,6 +163,12 @@ class ScoreBlocker:
         # Use a single enter/leave on root only, and check mouse position in motion
         self.root.bind('<Enter>', self.on_enter)
         self.root.bind('<Leave>', self.on_leave)
+
+        # Keyboard shortcuts: c = snap to latest CBS ticker position,
+        # f = snap to latest FOX ticker position. Both use the monitor that
+        # the ScoreBlocker is currently on.
+        self.root.bind('<KeyPress-c>', lambda e: self._snap_to_network('cbs'))
+        self.root.bind('<KeyPress-f>', lambda e: self._snap_to_network('fox'))
         
     def on_enter(self, event):
         """Show text when mouse enters window"""
@@ -289,6 +313,103 @@ class ScoreBlocker:
         self.dragging = False
         self.resizing = False
         self.resize_edge = None
+
+    def on_double_click(self, event):
+        """Auto-position the overlay over the score ticker for the NFL game
+        playing in any open browser window.
+
+        Flash colour signals the outcome:
+          green  - found a game; either moved the window onto the ticker, or
+                   the cell is known to have no ticker (window unchanged)
+          yellow - found a game but this (network, year) cell isn't yet annotated
+          red    - couldn't find an NFL game in any browser window, or the
+                   feature isn't supported on this OS
+        In every "no rect" case the window position is left alone.
+        """
+        # Cancel any drag/resize state the second click started.
+        self.dragging = False
+        self.resizing = False
+        self.resize_edge = None
+
+        try:
+            from auto_position import decide_position
+        except ImportError as e:
+            print(f"auto_position not available: {e}")
+            self._flash_border('red')
+            return
+
+        decision = decide_position()
+        print(f"auto-position: {decision.kind} - {decision.detail}")
+
+        if decision.kind == 'ticker' and decision.rect:
+            x, y, w, h = decision.rect
+            self.root.geometry(f"{w}x{h}+{x}+{y}")
+            self._flash_border('green')
+        elif decision.kind == 'no_ticker':
+            self._flash_border('green')
+        elif decision.kind == 'unreviewed':
+            self._flash_border('yellow')
+        else:  # 'no_game', 'unsupported', or anything else
+            self._flash_border('red')
+
+    def _snap_to_network(self, slug: str):
+        """Snap the window onto the most-recent ticker rect for a network,
+        on whichever monitor the window is currently on. Bound to c/f keys.
+        """
+        try:
+            from auto_position import (
+                latest_ticker_rect_for, monitor_for_point, normalized_to_screen,
+            )
+        except ImportError as e:
+            print(f"auto_position not available: {e}")
+            self._flash_border('red')
+            return
+
+        rect_norm = latest_ticker_rect_for(slug)
+        if rect_norm is None:
+            print(f"snap-to-{slug}: no ticker data found")
+            self._flash_border('red')
+            return
+
+        cx = self.root.winfo_rootx() + self.root.winfo_width() // 2
+        cy = self.root.winfo_rooty() + self.root.winfo_height() // 2
+        monitor = monitor_for_point(cx, cy)
+        if monitor is None:
+            print(f"snap-to-{slug}: no monitor found at ({cx}, {cy})")
+            self._flash_border('red')
+            return
+
+        sx, sy, sw, sh = normalized_to_screen(rect_norm, monitor)
+        self.root.geometry(f"{sw}x{sh}+{sx}+{sy}")
+        print(f"snap-to-{slug}: rect={rect_norm} -> {sw}x{sh}+{sx}+{sy}")
+        self._flash_border('green')
+
+    def _flash_border(self, color: str, duration_ms: int = 700):
+        """Briefly tint the window border, then restore the configured colour.
+
+        Sets BOTH highlightbackground (unfocused) and highlightcolor (focused)
+        so the flash is visible regardless of which one tk decides to render.
+        After a double-click the window typically holds focus, which means
+        only highlightcolor is shown.
+        """
+        flash_colors = {
+            'green':  '#22cc44',
+            'red':    '#cc2222',
+            'yellow': '#ddcc22',
+        }
+        c = flash_colors.get(color, color)
+        self.root.configure(highlightbackground=c, highlightcolor=c)
+        # Generation counter handles overlapping flashes: only the most recent
+        # flash gets to restore the original colour.
+        self._flash_gen = getattr(self, '_flash_gen', 0) + 1
+        my_gen = self._flash_gen
+        def _restore():
+            if self._flash_gen == my_gen:
+                self.root.configure(
+                    highlightbackground=self.border_color,
+                    highlightcolor=self.border_color,
+                )
+        self.root.after(duration_ms, _restore)
 
     def on_right_release(self, event):
         """Handle right-click release - close the application"""

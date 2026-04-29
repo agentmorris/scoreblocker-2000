@@ -11,13 +11,50 @@ ScoreBlocker 2000 is advanced technology for sports fans who want to watch games
 * Drag to move/resize
 * Multi-monitor support with preset configurations
 * Launch multiple instances simultaneously
+* **Auto-position over an NFL game's other-games score ticker with a double-click**
+  (Windows only — see "Auto-positioning for NFL games" below)
 
 ## 🏃‍♂️ Mobility & Control
 
 - **Left-click and drag**: Move ScoreBlocker 2000 anywhere on your screen
 - **Drag from edges or corners**: Resize the window
+- **Double-click**: Auto-position over the other-games score ticker for the NFL
+  game playing in any open Chrome / Firefox / Edge window (Windows only — see
+  "Auto-positioning for NFL games" below).
+- **`c` key** (with the window focused): snap to the most-recent known CBS
+  ticker position on whichever monitor the window is currently on. Handy when
+  the new season's data hasn't been added yet but you know the game's on CBS.
+- **`f` key**: same, for FOX.
 - **Middle-click**: Show current coordinates and copy to clipboard (helpful for creating config files!)
 - **Right-click**: Exit the application
+
+## 🤖 Auto-positioning for NFL games
+
+Double-clicking ScoreBlocker 2000 will look at any open Chrome, Firefox, or Edge
+windows for an NFL game. If it finds one, it figures out which broadcast network
+the game is on, looks up where that network shows its other-games score ticker
+in the broadcast frame, and snaps the window over the ticker on whichever
+monitor the game is on.
+
+The window border briefly flashes:
+- **green** if it found a game and snapped (or if the network is one that's
+  known not to show an other-games ticker, in which case it leaves the window
+  where it is)
+- **yellow** if it found an NFL game but doesn't have ticker data for that
+  (network, season) yet — typical for new seasons before the data is refreshed
+- **red** if it can't find an NFL game in any open browser window
+
+Press **`c`** with the window focused to snap to the most-recent known CBS
+ticker position on the monitor the window is on; **`f`** does the same for FOX.
+
+There's no AI here — auto-positioning is just a lookup against a database of
+known ticker positions that was built once for the 2009-2025 seasons and gets
+updated annually. The (game URL → broadcast network) data comes from the
+[506sports](https://archive.506sports.com/) wiki archive; the per-network
+ticker positions were measured by hand-annotating broadcast frames captured
+from NFL+ Full Game Replays. See
+[github.com/agentmorris/auto-scoreblock](https://github.com/agentmorris/auto-scoreblock)
+for how the database is built and how to update it for a new season.
 
 ## 🏁 Getting Started
 
